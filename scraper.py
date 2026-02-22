@@ -5,8 +5,11 @@ Handles 403/rate-limit errors with:
 - Realistic browser headers + Accept/Referer fields
 - requests.Session for cookie persistence
 - Exponential back-off on non-200 responses
+- Optional ScraperAPI proxy (set SCRAPER_API_KEY env var) to bypass
+  datacenter IP blocks when running on Railway/cloud hosts
 """
 
+import os
 import time
 import random
 import re
@@ -14,6 +17,22 @@ import re
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+
+# ScraperAPI routes requests through residential IPs, bypassing Letterboxd's
+# datacenter IP blocks. Free tier = 1,000 req/month — enough for twice-weekly
+# scraping of two profiles. Sign up at https://www.scraperapi.com/
+SCRAPER_API_KEY = os.environ.get("SCRAPER_API_KEY", "")
+
+
+def _proxy_url(target_url: str) -> str:
+    """Wrap *target_url* with ScraperAPI if a key is configured."""
+    if SCRAPER_API_KEY:
+        return (
+            f"http://api.scraperapi.com/?api_key={SCRAPER_API_KEY}"
+            f"&url={requests.utils.quote(target_url, safe='')}"
+            f"&render=false"
+        )
+    return target_url
 
 
 _HEADERS = {
@@ -102,36 +121,44 @@ def scrape_letterboxd_films(username: str, max_pages: int = 50) -> list[dict]:
     Returns a list of dicts with keys: film_title, rating, rating_stars.
     """
     films: list[dict] = []
+    using_proxy = bool(SCRAPER_API_KEY)
+    print(f"  Proxy mode: {'ScraperAPI' if using_proxy else 'direct (no proxy)'}")
+
     session = requests.Session()
-    session.headers.update(_HEADERS)
+    # Only set browser headers for direct requests; ScraperAPI handles its own
+    if not using_proxy:
+        session.headers.update(_HEADERS)
 
     # Warm-up: visit the profile root so Letterboxd sets session cookies
-    try:
-        warmup = session.get(
-            f"https://letterboxd.com/{username}/",
-            timeout=10,
-        )
-        if warmup.status_code == 403:
-            print(f"❌ Profile '{username}' is private or blocked (403 on warm-up).")
-            return films
-        time.sleep(random.uniform(1.5, 2.5))
-    except requests.exceptions.RequestException as exc:
-        print(f"⚠️  Warm-up request failed: {exc}")
+    # (skipped when using proxy — ScraperAPI manages sessions)
+    if not using_proxy:
+        try:
+            warmup = session.get(
+                f"https://letterboxd.com/{username}/",
+                timeout=10,
+            )
+            if warmup.status_code == 403:
+                print(f"❌ Profile '{username}' is private or blocked (403 on warm-up).")
+                return films
+            time.sleep(random.uniform(1.5, 2.5))
+        except requests.exceptions.RequestException as exc:
+            print(f"⚠️  Warm-up request failed: {exc}")
 
     for page in range(1, max_pages + 1):
-        url = f"https://letterboxd.com/{username}/films/page/{page}/"
-        print(f"Scraping page {page}: {url}")
+        target_url = f"https://letterboxd.com/{username}/films/page/{page}/"
+        fetch_url = _proxy_url(target_url)
+        print(f"Scraping page {page}: {target_url}")
 
-        # Referer header makes requests look more like normal browsing
-        session.headers["Referer"] = (
-            f"https://letterboxd.com/{username}/films/page/{page - 1}/"
-            if page > 1
-            else f"https://letterboxd.com/{username}/"
-        )
+        if not using_proxy:
+            session.headers["Referer"] = (
+                f"https://letterboxd.com/{username}/films/page/{page - 1}/"
+                if page > 1
+                else f"https://letterboxd.com/{username}/"
+            )
 
         for attempt in range(3):
             try:
-                response = session.get(url, timeout=15)
+                response = session.get(fetch_url, timeout=30)
                 break
             except requests.exceptions.RequestException as exc:
                 wait = 2 ** attempt

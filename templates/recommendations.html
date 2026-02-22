@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Recommendations</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Movie Recommendations</h1>
+            <a href="{{ url_for('index') }}" class="back-link">← Back to Home</a>
+        </header>
+
+        <div class="filters">
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label>Content Type:</label>
+                    <select id="contentType">
+                        <option value="movies" selected>Movies Only</option>
+                        <option value="all">All (Movies & TV)</option>
+                        <option value="tv">TV Shows Only</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Genre:</label>
+                    <select id="genre">
+                        <option value="">All Genres</option>
+                        <option value="Drama">Drama</option>
+                        <option value="Thriller">Thriller</option>
+                        <option value="Mystery">Mystery</option>
+                        <option value="Crime">Crime</option>
+                        <option value="Action">Action</option>
+                        <option value="Comedy">Comedy</option>
+                        <option value="Horror">Horror</option>
+                        <option value="Science Fiction">Science Fiction</option>
+                        <option value="Romance">Romance</option>
+                        <option value="Animation">Animation</option>
+                        <option value="Documentary">Documentary</option>
+                        <option value="Fantasy">Fantasy</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Decade:</label>
+                    <select id="decade">
+                        <option value="">Any Decade</option>
+                        <option value="2020">2020s</option>
+                        <option value="2010">2010s</option>
+                        <option value="2000">2000s</option>
+                        <option value="1990">1990s</option>
+                        <option value="1980">1980s</option>
+                        <option value="1970">1970s</option>
+                        <option value="1960">1960s</option>
+                        <option value="1950">1950s</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Sort By:</label>
+                    <select id="sortBy">
+                        <option value="recommendation_count" selected>Most Recommended</option>
+                        <option value="rating">Highest Rating</option>
+                        <option value="year">Newest First</option>
+                        <option value="year_oldest">Oldest First</option>
+                        <option value="title">Title (A-Z)</option>
+                        <option value="rec_count">Recommendation Count</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-actions">
+                <button onclick="applyFilters()" class="btn magnetic filter-button">
+                    <span>Apply Filters</span>
+                    <div class="particles-field"></div>
+                </button>
+                <button onclick="surpriseUs()" class="btn magnetic filter-button surprise-button">
+                    <span>Surprise Us!</span>
+                    <div class="particles-field"></div>
+                </button>
+                <button onclick="resetFilters()" class="btn magnetic filter-button reset-button">
+                    <span>Reset</span>
+                    <div class="particles-field"></div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <div class="search-section">
+            <div class="search-container">
+                <input type="text" id="movieSearch" placeholder="Search for movies..." class="search-input" />
+                <button onclick="performSearch()" class="btn magnetic search-button">
+                    <span>Search</span>
+                    <div class="particles-field"></div>
+                </button>
+                <button onclick="clearSearch()" class="btn magnetic search-button clear-search-button" style="display: none;">
+                    <span>Clear</span>
+                    <div class="particles-field"></div>
+                </button>
+            </div>
+            <div id="searchResultsSection" class="search-results-section" style="display: none;">
+                <h2 class="section-title">Search Results</h2>
+                <div id="searchResults" class="recommendations-grid"></div>
+            </div>
+        </div>
+
+        <!-- Surprise Us Movie - shows one random movie on top -->
+        <div id="surpriseSection" style="display: none;" class="surprise-section">
+            <h2 class="section-title">Surprise Us!</h2>
+            <div id="surpriseMovie" class="recommendations-grid"></div>
+        </div>
+
+        <section class="recommendations-section">
+            <h2 class="section-title" id="sectionTitle">Movies</h2>
+            <div id="recommendations" class="recommendations-grid">
+                <!-- Recommendations will be loaded via JavaScript on page load -->
+                <div class="loading-message">Loading recommendations...</div>
+                {% for rec in recommendations %}
+                <div class="movie-card">
+                    {% if rec.poster_url %}
+                    <img src="{{ rec.poster_url }}" alt="{{ rec.title }}" class="movie-poster" onerror="this.style.display='none'">
+                    {% endif %}
+                    <div class="movie-info">
+                        <div class="movie-title-row">
+                            <h3 class="movie-title"><a href="{{ url_for('movie_detail', tmdb_id=rec.tmdb_id) }}" class="movie-title-link">{{ rec.title }} ({{ rec.year }})</a></h3>
+                            <a href="https://www.youtube.com/results?search_query={{ (rec.title + ' ' + (rec.year|string if rec.year else '') + ' trailer')|urlencode }}" 
+                               target="_blank" 
+                               class="trailer-link" 
+                               title="Watch trailer">
+                                <span class="play-icon">▶</span>
+                            </a>
+                        </div>
+                    <div class="movie-meta">
+                        {% if rec.imdb_id %}
+                        <a href="https://www.imdb.com/title/{{ rec.imdb_id }}" target="_blank" class="external-rating-link imdb-link" title="View on IMDB">
+                            <span class="rating-icon-small">🎬</span> IMDB: {{ rec.imdb_rating if rec.imdb_rating else 'N/A' }}
+                        </a>
+                        {% endif %}
+                        {% if rec.rotten_tomatoes_rating %}
+                        <a href="https://www.rottentomatoes.com/search?search={{ rec.title|urlencode }}" target="_blank" class="external-rating-link rt-link" title="View on Rotten Tomatoes">
+                            <span class="rating-icon-small">🍅</span> RT: {{ rec.rotten_tomatoes_rating }}
+                        </a>
+                        {% endif %}
+                    </div>
+                        {% if rec.sali_percent is defined and rec.gorg_percent is defined %}
+                        <div class="prediction-badges">
+                            {% set sali_tooltip = (rec.sali_reasons | join(' • ') if rec.sali_reasons and rec.sali_reasons|length > 0 else (rec.recommended_because if rec.recommended_because else 'Based on your rating history')) %}
+                            {% set gorg_tooltip = (rec.gorg_reasons | join(' • ') if rec.gorg_reasons and rec.gorg_reasons|length > 0 else (rec.recommended_because if rec.recommended_because else 'Based on your rating history')) %}
+                            <span class="prediction-badge sali tooltip-trigger" 
+                                  data-tooltip="{{ sali_tooltip | replace('"', '&quot;') | replace('<', '&lt;') | replace('>', '&gt;') }}">
+                                Sali: {{ rec.sali_percent }}%
+                            </span>
+                            <span class="prediction-badge gorg tooltip-trigger" 
+                                  data-tooltip="{{ gorg_tooltip | replace('"', '&quot;') | replace('<', '&lt;') | replace('>', '&gt;') }}">
+                                Gorg: {{ rec.gorg_percent }}%
+                            </span>
+                        </div>
+                        {% endif %}
+                        <p class="movie-overview">{% if rec.overview and rec.overview is string %}{{ rec.overview[:200] }}{% if rec.overview|length > 200 %}...{% endif %}{% else %}No overview available{% endif %}</p>
+                        <div class="movie-sources">
+                            <strong>Based on:</strong> {{ rec.recommended_because }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                <!-- TV recommendations hidden by default - only show when "All" or "TV" is selected -->
+                {% for tv in tv_recommendations %}
+                <div class="movie-card">
+                    {% if tv.poster_url %}
+                    <img src="{{ tv.poster_url }}" alt="{{ tv.title }}" class="movie-poster" onerror="this.style.display='none'">
+                    {% endif %}
+                    <div class="movie-info">
+                        <div class="movie-title-row">
+                            <h3 class="movie-title">{{ tv.title }} ({{ tv.year }})</h3>
+                            <a href="https://www.youtube.com/results?search_query={{ (tv.title + ' ' + (tv.year|string if tv.year else '') + ' trailer')|urlencode }}" 
+                               target="_blank" 
+                               class="trailer-link" 
+                               title="Watch trailer">
+                                <span class="play-icon">▶</span>
+                            </a>
+                        </div>
+                        <div class="movie-meta">
+                            <span class="rating-badge">⭐ {{ "%.1f"|format(tv.tmdb_rating) }}</span>
+                            {% if tv.recommendation_count %}
+                            <span class="rec-badge">Recommended {{ tv.recommendation_count }}x</span>
+                            {% endif %}
+                        </div>
+                        {% if tv.sali_percent is defined and tv.gorg_percent is defined %}
+                        <div class="prediction-badges">
+                            {% set tv_sali_tooltip = (tv.sali_reasons | join(' • ') if tv.sali_reasons and tv.sali_reasons|length > 0 else (tv.recommended_because if tv.recommended_because else 'Based on your rating history')) %}
+                            {% set tv_gorg_tooltip = (tv.gorg_reasons | join(' • ') if tv.gorg_reasons and tv.gorg_reasons|length > 0 else (tv.recommended_because if tv.recommended_because else 'Based on your rating history')) %}
+                            <span class="prediction-badge sali tooltip-trigger" 
+                                  data-tooltip="{{ tv_sali_tooltip | replace('"', '&quot;') | replace('<', '&lt;') | replace('>', '&gt;') }}">
+                                Sali: {{ tv.sali_percent }}%
+                            </span>
+                            <span class="prediction-badge gorg tooltip-trigger" 
+                                  data-tooltip="{{ tv_gorg_tooltip | replace('"', '&quot;') | replace('<', '&lt;') | replace('>', '&gt;') }}">
+                                Gorg: {{ tv.gorg_percent }}%
+                            </span>
+                        </div>
+                        {% endif %}
+                        <p class="movie-overview">{% if tv.overview and tv.overview is string %}{{ tv.overview[:200] }}{% if tv.overview|length > 200 %}...{% endif %}{% else %}No overview available{% endif %}</p>
+                        <div class="movie-sources">
+                            <strong>Based on:</strong> {{ tv.recommended_because }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if not recommendations and not tv_recommendations %}
+            <div class="no-results">
+                <p>No recommendations found. Run the recommendation scripts first!</p>
+            </div>
+            {% endif %}
+        </section>
+
+    </div>
+
+    <script>
+        // Main function to apply filters and fetch recommendations
+        function applyFilters(surprise = false) {
+            // Get filter values from the form
+            const decade = document.getElementById('decade').value;
+            const genre = document.getElementById('genre').value;
+            const sortBy = document.getElementById('sortBy').value;
+            const contentType = document.getElementById('contentType').value;
+
+            // Build API URL with filter parameters
+            let url = `/api/recommendations?sort_by=${sortBy}&type=${contentType}`;
+            
+            // Add decade filter if selected
+            if (decade) {
+                url += `&decade=${decade}`;
+            }
+            
+            // Add genre filter if selected
+            if (genre) {
+                url += `&genre=${encodeURIComponent(genre)}`;
+            }
+            
+            // Add surprise parameter if "Surprise Us" was clicked
+            if (surprise) {
+                url += `&surprise=true`;
+            }
+
+            // Fetch recommendations from API
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const grid = document.getElementById('recommendations');
+                    const sectionTitle = document.getElementById('sectionTitle');
+                    const surpriseSection = document.getElementById('surpriseSection');
+                    const surpriseMovieDiv = document.getElementById('surpriseMovie');
+                    
+                    // Clear existing content
+                    grid.innerHTML = '';
+                    surpriseSection.style.display = 'none';
+                    surpriseMovieDiv.innerHTML = '';
+                    
+                    // Show surprise movie if it exists (from "Surprise Us" button)
+                    if (data.surprise_movie) {
+                        surpriseSection.style.display = 'block';
+                        renderMovieCard(data.surprise_movie, surpriseMovieDiv, true);
+                    }
+                    
+                    // Update section title based on content type
+                    const contentTypeSelect = document.getElementById('contentType');
+                    const selectedType = contentTypeSelect ? contentTypeSelect.value : 'all';
+                    if (selectedType === 'movies') {
+                        sectionTitle.textContent = 'Movies';
+                    } else if (selectedType === 'tv') {
+                        sectionTitle.textContent = 'TV Shows';
+                    } else {
+                        sectionTitle.textContent = 'All Recommendations';
+                    }
+                    
+                    // Check if we have recommendations
+                    const recommendations = data.recommendations || data;
+                    if (!recommendations || recommendations.length === 0) {
+                        grid.innerHTML = '<div class="no-results"><p>No recommendations match your filters. Try adjusting your criteria.</p></div>';
+                        return;
+                    }
+
+                    // Render each recommendation card
+                    recommendations.forEach(rec => {
+                        renderMovieCard(rec, grid, false);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+        
+        // Helper function to render a movie card
+        function renderMovieCard(rec, container, isSurprise) {
+            const card = document.createElement('div');
+            card.className = 'movie-card';
+            // Add special styling for surprise movie
+            if (isSurprise) {
+                card.classList.add('surprise-card');
+            }
+            
+            // Add poster image if available (make it clickable)
+            let posterHtml = '';
+            if (rec.poster_url && rec.tmdb_id) {
+                posterHtml = `<a href="/movie/${rec.tmdb_id}"><img src="${rec.poster_url}" alt="${rec.title}" class="movie-poster clickable-poster" onerror="this.style.display='none'"></a>`;
+            } else if (rec.poster_url) {
+                posterHtml = `<img src="${rec.poster_url}" alt="${rec.title}" class="movie-poster" onerror="this.style.display='none'">`;
+            }
+            
+            // Create YouTube trailer search URL
+            const trailerQuery = encodeURIComponent(`${rec.title} ${rec.year} trailer`);
+            
+            // Add prediction badges if percentages are available
+            let predictionHtml = '';
+            if (rec.sali_percent !== undefined && rec.gorg_percent !== undefined) {
+                // Build detailed tooltip text from reasons (minimum 3 reasons)
+                let saliTooltipText = 'Based on your rating history:';
+                let gorgTooltipText = 'Based on your rating history:';
+                
+                if (rec.sali_reasons && Array.isArray(rec.sali_reasons) && rec.sali_reasons.length > 0) {
+                    // Join reasons with bullets for readability
+                    saliTooltipText = rec.sali_reasons.slice(0, 5).join(' • '); // Join up to 5 reasons with bullet separator
+                } else if (rec.recommended_because) {
+                    saliTooltipText = `Based on: ${rec.recommended_because}`;
+                }
+                
+                if (rec.gorg_reasons && Array.isArray(rec.gorg_reasons) && rec.gorg_reasons.length > 0) {
+                    // Join reasons with bullets for readability
+                    gorgTooltipText = rec.gorg_reasons.slice(0, 5).join(' • '); // Join up to 5 reasons with bullet separator
+                } else if (rec.recommended_because) {
+                    gorgTooltipText = `Based on: ${rec.recommended_because}`;
+                }
+                
+                // Escape quotes and HTML for tooltip
+                const escapeHtml = (str) => String(str).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                
+                predictionHtml = `
+                    <div class="prediction-badges">
+                        <span class="prediction-badge sali tooltip-trigger" data-tooltip="${escapeHtml(saliTooltipText)}">Sali: ${rec.sali_percent}%</span>
+                        <span class="prediction-badge gorg tooltip-trigger" data-tooltip="${escapeHtml(gorgTooltipText)}">Gorg: ${rec.gorg_percent}%</span>
+                    </div>
+                `;
+            }
+            
+            // Build the HTML for the movie card
+            card.innerHTML = `
+                ${posterHtml}
+                <div class="movie-info">
+                    <div class="movie-title-row">
+                        <h3 class="movie-title"><a href="/movie/${rec.tmdb_id}" class="movie-title-link">${rec.title} (${rec.year})</a></h3>
+                        <a href="https://www.youtube.com/results?search_query=${trailerQuery}" 
+                           target="_blank" 
+                           class="trailer-link" 
+                           title="Watch trailer">
+                            <span class="play-icon">▶</span>
+                        </a>
+                    </div>
+                    <div class="movie-meta">
+                        ${rec.imdb_id ? `<a href="https://www.imdb.com/title/${rec.imdb_id}" target="_blank" class="external-rating-link imdb-link" title="View on IMDB"><span class="rating-icon-small">🎬</span> IMDB: ${rec.imdb_rating || 'N/A'}</a>` : ''}
+                        ${rec.rotten_tomatoes_rating ? `<a href="https://www.rottentomatoes.com/search?search=${encodeURIComponent(rec.title)}" target="_blank" class="external-rating-link rt-link" title="View on Rotten Tomatoes"><span class="rating-icon-small">🍅</span> RT: ${rec.rotten_tomatoes_rating}</a>` : ''}
+                    </div>
+                    ${predictionHtml}
+                    <p class="movie-overview">${rec.overview ? (rec.overview.substring(0, 200) + (rec.overview.length > 200 ? '...' : '')) : 'No overview available'}</p>
+                    <div class="movie-sources">
+                        <strong>Based on:</strong> ${rec.recommended_because || 'N/A'}
+                    </div>
+                </div>
+            `;
+            // Add the card to the container
+            container.appendChild(card);
+        }
+        
+        // "Surprise Us" button handler - picks one random movie
+        function surpriseUs() {
+            applyFilters(true);
+        }
+        
+        // Reset all filters to default values
+        function resetFilters() {
+            document.getElementById('decade').value = '';
+            document.getElementById('genre').value = '';
+            document.getElementById('sortBy').value = 'recommendation_count';  // Sort by recommendation count (highest first)
+            document.getElementById('contentType').value = 'movies';  // Default to movies only
+            applyFilters();
+        }
+        
+        // Search functionality
+        function performSearch() {
+            const searchInput = document.getElementById('movieSearch');
+            const query = searchInput.value.trim();
+            
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+            
+            // Show loading state
+            const searchResults = document.getElementById('searchResults');
+            const searchResultsSection = document.getElementById('searchResultsSection');
+            searchResults.innerHTML = '<div class="loading-message">Searching...</div>';
+            searchResultsSection.style.display = 'block';
+            
+            // Hide main recommendations while searching
+            document.getElementById('recommendations').style.display = 'none';
+            document.getElementById('sectionTitle').style.display = 'none';
+            document.getElementById('surpriseSection').style.display = 'none';
+            
+            // Show clear search button
+            document.querySelector('.clear-search-button').style.display = 'inline-block';
+            
+            // Fetch search results
+            fetch(`/api/search?query=${encodeURIComponent(query)}&limit=20`)
+                .then(response => response.json())
+                .then(data => {
+                    searchResults.innerHTML = '';
+                    
+                    if (data.error) {
+                        searchResults.innerHTML = `<div class="no-results"><p>Error: ${data.error}</p></div>`;
+                        return;
+                    }
+                    
+                    const results = data.results || [];
+                    
+                    if (results.length === 0) {
+                        searchResults.innerHTML = '<div class="no-results"><p>No movies found. Try a different search query.</p></div>';
+                        return;
+                    }
+                    
+                    // Render each search result using the same card format
+                    results.forEach(movie => {
+                        renderMovieCard(movie, searchResults, false);
+                    });
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    searchResults.innerHTML = '<div class="no-results"><p>An error occurred while searching. Please try again.</p></div>';
+                });
+        }
+        
+        // Clear search and show recommendations again
+        function clearSearch() {
+            const searchInput = document.getElementById('movieSearch');
+            const searchResultsSection = document.getElementById('searchResultsSection');
+            const clearButton = document.querySelector('.clear-search-button');
+            
+            searchInput.value = '';
+            searchResultsSection.style.display = 'none';
+            clearButton.style.display = 'none';
+            
+            // Show main recommendations again
+            document.getElementById('recommendations').style.display = 'grid';
+            document.getElementById('sectionTitle').style.display = 'block';
+        }
+        
+        // Allow Enter key to trigger search
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('movieSearch');
+            if (searchInput) {
+                searchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        performSearch();
+                    }
+                });
+            }
+        });
+        
+        // Tooltips are handled by CSS automatically (via ::after pseudo-element)
+        // No JavaScript initialization needed
+        
+        // Load movies only when page loads (default view)
+        window.addEventListener('DOMContentLoaded', function() {
+            // Set default to movies only
+            document.getElementById('contentType').value = 'movies';
+            // Fetch and display movies only
+            applyFilters();
+            
+            // Initialize magnetic effect on all clickable elements
+            initMagneticButtons();
+            // Watch for new elements added dynamically
+            applyMagneticToNewElements();
+        });
+        
+        // Magnetic Effect for all clickable elements
+        function initMagneticButtons() {
+            // Select all clickable elements
+            // Get all links and buttons first
+            const allLinks = document.querySelectorAll('a, button');
+            const clickableElements = new Set();
+            
+            allLinks.forEach(link => {
+                clickableElements.add(link);
+            });
+            
+            // Also get clickable posters (images inside links - apply to parent link)
+            document.querySelectorAll('.clickable-poster').forEach(img => {
+                const parentLink = img.closest('a');
+                if (parentLink) {
+                    clickableElements.add(parentLink);
+                }
+            });
+            
+            clickableElements.forEach(element => {
+                // Skip if element already has particles field
+                if (element.querySelector('.particles-field')) return;
+                
+                // Create particles field if it doesn't exist
+                let particlesField = element.querySelector('.particles-field');
+                if (!particlesField) {
+                    particlesField = document.createElement('div');
+                    particlesField.className = 'particles-field';
+                    element.appendChild(particlesField);
+                }
+                
+                // Create 30 particles for smaller elements (less intense effect)
+                const particleCount = element.classList.contains('btn') || element.tagName === 'BUTTON' ? 50 : 30;
+                
+                // Randomly assign colored particles
+                const blueCount = Math.floor(Math.random() * 2) + 2; // 2-3 blue particles
+                const purpleCount = Math.floor(Math.random() * 2) + 1; // 1-2 purple particles
+                const coloredParticleCount = blueCount + purpleCount;
+                const coloredIndices = [];
+                
+                // Randomly select indices for colored particles
+                while (coloredIndices.length < coloredParticleCount) {
+                    const randomIndex = Math.floor(Math.random() * particleCount);
+                    if (!coloredIndices.includes(randomIndex)) {
+                        coloredIndices.push(randomIndex);
+                    }
+                }
+                
+                // Shuffle to randomly assign colors
+                const shuffled = coloredIndices.sort(() => Math.random() - 0.5);
+                const blueIndices = shuffled.slice(0, blueCount);
+                const purpleIndices = shuffled.slice(blueCount, blueCount + purpleCount);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    
+                    // Assign muted purple or muted blue color to selected particles
+                    if (blueIndices.includes(i)) {
+                        particle.classList.add('particle-blue');
+                    } else if (purpleIndices.includes(i)) {
+                        particle.classList.add('particle-purple');
+                    }
+                    
+                    particle.style.setProperty('--x', `${Math.random() * 150 - 75}px`);
+                    particle.style.setProperty('--y', `${Math.random() * 150 - 75}px`);
+                    particle.style.animation = `particleFloat ${1 + Math.random() * 2}s infinite`;
+                    particle.style.left = `${Math.random() * 100}%`;
+                    particle.style.top = `${Math.random() * 100}%`;
+                    particlesField.appendChild(particle);
+                }
+                
+                // Mouse move handler - magnetic effect (lighter effect for links)
+                const magneticStrength = element.classList.contains('btn') || element.tagName === 'BUTTON' ? 0.3 : 0.15;
+                
+                element.addEventListener('mousemove', (e) => {
+                    const rect = element.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    
+                    // Calculate element center
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
+                    // Magnetic pull (lighter for links)
+                    const moveX = (mouseX - centerX) * magneticStrength;
+                    const moveY = (mouseY - centerY) * magneticStrength;
+                    
+                    element.style.transform = `translate(${moveX}px, ${moveY}px)`;
+                });
+                
+                // Mouse leave handler - smooth return
+                element.addEventListener('mouseleave', () => {
+                    element.style.transform = 'translate(0, 0)';
+                });
+            });
+        }
+        
+        // Also apply to dynamically added elements
+        function applyMagneticToNewElements() {
+            const observer = new MutationObserver(() => {
+                initMagneticButtons();
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    </script>
+</body>
+</html>
+

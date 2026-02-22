@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ movie.title }} - Movie Details</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="{{ url_for('index') }}" class="back-link">← Back to Home</a>
+            <h1>{{ movie.title }}</h1>
+            <p class="subtitle">{{ movie.get('release_date', '')[:4] if movie.get('release_date') else 'N/A' }}</p>
+        </header>
+
+        <div class="movie-detail-grid">
+            <div class="movie-detail-poster">
+                {% if movie.poster_path %}
+                <a href="{{ url_for('movie_detail', tmdb_id=movie.id) }}">
+                    <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" alt="{{ movie.title }}" class="detail-poster clickable-poster">
+                </a>
+                {% endif %}
+                <div class="movie-actions">
+                    <a href="https://www.youtube.com/results?search_query={{ (movie.title + ' ' + (movie.release_date[:4] if movie.release_date else '') + ' trailer')|urlencode }}" 
+                       target="_blank" 
+                       class="btn magnetic trailer-button">
+                        <span><span class="play-icon-large">▶</span> Watch Trailer</span>
+                        <div class="particles-field"></div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="movie-detail-info">
+                <div class="movie-rating-section">
+                    <div class="rating-badge-large">⭐ {{ "%.1f"|format(movie.vote_average) }}</div>
+                    <span class="vote-count">{{ movie.vote_count }} votes</span>
+                    {% if imdb_rating or imdb_id %}
+                    <div class="external-ratings">
+                        {% if imdb_id %}
+                        <a href="https://www.imdb.com/title/{{ imdb_id }}" target="_blank" class="rating-link imdb-link" title="View on IMDB">
+                            <span class="rating-icon">🎬</span> IMDB: {{ imdb_rating if imdb_rating else 'N/A' }}
+                        </a>
+                        {% endif %}
+                        {% if rotten_tomatoes_rating %}
+                        <a href="https://www.rottentomatoes.com/m/{{ movie.title|lower|replace(' ', '_') }}" target="_blank" class="rating-link rt-link" title="View on Rotten Tomatoes">
+                            <span class="rating-icon">🍅</span> RT: {{ rotten_tomatoes_rating }}
+                        </a>
+                        {% elif imdb_id %}
+                        <a href="https://www.rottentomatoes.com/search?search={{ movie.title|urlencode }}" target="_blank" class="rating-link rt-link" title="View on Rotten Tomatoes">
+                            <span class="rating-icon">🍅</span> RT: N/A
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="movie-overview-full">
+                    <h2>Overview</h2>
+                    <p>{{ movie.overview }}</p>
+                </div>
+
+                {% if wikipedia_summary %}
+                <div class="wikipedia-section">
+                    <h2>From Wikipedia</h2>
+                    <p>{{ wikipedia_summary[:500] }}{% if wikipedia_summary|length > 500 %}...{% endif %}</p>
+                    {% if wikipedia_url %}
+                    <a href="{{ wikipedia_url }}" target="_blank" class="wikipedia-link">Read more on Wikipedia →</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="movie-stats">
+                    <div class="stat-item">
+                        <strong>Release Date:</strong> {{ movie.release_date if movie.release_date else 'N/A' }}
+                    </div>
+                    <div class="stat-item">
+                        <strong>Year Shot:</strong> {{ year_shot }}
+                    </div>
+                    <div class="stat-item">
+                        <strong>Runtime:</strong> {{ movie.runtime }} minutes
+                    </div>
+                    <div class="stat-item">
+                        <strong>Budget:</strong> {{ budget }}
+                    </div>
+                    <div class="stat-item">
+                        <strong>Revenue:</strong> {{ revenue }}
+                    </div>
+                    {% if production_companies %}
+                    <div class="stat-item">
+                        <strong>Production Companies:</strong> {{ production_companies|join(', ') }}
+                    </div>
+                    {% endif %}
+                    {% if production_countries %}
+                    <div class="stat-item">
+                        <strong>Filmed In:</strong> {{ production_countries|join(', ') }}
+                    </div>
+                    {% endif %}
+                    {% if filming_locations %}
+                    <div class="stat-item">
+                        <strong>Filming Locations:</strong> {{ filming_locations|join(', ') }}
+                    </div>
+                    {% endif %}
+                    {% if production_time %}
+                    <div class="stat-item">
+                        <strong>Production Time:</strong> {{ production_time }}
+                    </div>
+                    {% endif %}
+                    {% if camera_info %}
+                    <div class="stat-item">
+                        <strong>Camera:</strong> {{ camera_info }}
+                    </div>
+                    {% endif %}
+                    {% if movie.genres %}
+                    <div class="stat-item">
+                        <strong>Genres:</strong> 
+                        {% for genre in movie.genres %}
+                            <span class="genre-tag">{{ genre.name }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if random_fact %}
+                    <div class="stat-item highlight-fact">
+                        <strong>Random Fact:</strong> {{ random_fact }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if cast %}
+        <section class="cast-section">
+            <h2 class="section-title">Cast</h2>
+            <div class="cast-grid">
+                {% for actor in cast %}
+                <div class="cast-card">
+                    {% if actor.profile_path %}
+                    <img src="https://image.tmdb.org/t/p/w185{{ actor.profile_path }}" alt="{{ actor.name }}" class="cast-photo">
+                    {% else %}
+                    <div class="cast-photo-placeholder"></div>
+                    {% endif %}
+                    <div class="cast-info">
+                        <a href="https://www.themoviedb.org/person/{{ actor.id }}" target="_blank" class="cast-name">{{ actor.name }}</a>
+                        <p class="cast-character">{{ actor.character }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if similar %}
+        <section class="similar-section">
+            <h2 class="section-title">Similar Movies</h2>
+            <div class="recommendations-grid">
+                {% for sim in similar %}
+                <div class="movie-card">
+                    {% if sim.poster_path %}
+                    <a href="{{ url_for('movie_detail', tmdb_id=sim.id) }}">
+                        <img src="https://image.tmdb.org/t/p/w500{{ sim.poster_path }}" alt="{{ sim.title }}" class="movie-poster clickable-poster" onerror="this.style.display='none'">
+                    </a>
+                    {% endif %}
+                    <div class="movie-info">
+                        <div class="movie-title-row">
+                            <h3 class="movie-title"><a href="{{ url_for('movie_detail', tmdb_id=sim.id) }}" class="movie-title-link">{{ sim.title }} ({{ sim.release_date[:4] if sim.release_date else 'N/A' }})</a></h3>
+                            <a href="https://www.youtube.com/results?search_query={{ (sim.title + ' ' + (sim.release_date[:4] if sim.release_date else '') + ' trailer')|urlencode }}" 
+                               target="_blank" 
+                               class="trailer-link" 
+                               title="Watch trailer">
+                                <span class="play-icon">▶</span>
+                            </a>
+                        </div>
+                        <div class="movie-meta">
+                            <span class="rating-badge">⭐ {{ "%.1f"|format(sim.vote_average) if sim.vote_average else 'N/A' }}</span>
+                        </div>
+                        <p class="movie-overview">{% if sim.overview %}{{ sim.overview[:150] }}{% if sim.overview|length > 150 %}...{% endif %}{% else %}No overview available{% endif %}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+    </div>
+    
+    <script>
+        // Magnetic Effect for all clickable elements
+        function initMagneticButtons() {
+            // Select all clickable elements
+            // Get all links and buttons first
+            const allLinks = document.querySelectorAll('a, button');
+            const clickableElements = new Set();
+            
+            allLinks.forEach(link => {
+                clickableElements.add(link);
+            });
+            
+            // Also get clickable posters (images inside links - apply to parent link)
+            document.querySelectorAll('.clickable-poster').forEach(img => {
+                const parentLink = img.closest('a');
+                if (parentLink) {
+                    clickableElements.add(parentLink);
+                }
+            });
+            
+            clickableElements.forEach(element => {
+                // Skip if element already has particles field
+                if (element.querySelector('.particles-field')) return;
+                
+                // Create particles field if it doesn't exist
+                let particlesField = element.querySelector('.particles-field');
+                if (!particlesField) {
+                    particlesField = document.createElement('div');
+                    particlesField.className = 'particles-field';
+                    element.appendChild(particlesField);
+                }
+                
+                // Create 30 particles for smaller elements (less intense effect)
+                const particleCount = element.classList.contains('btn') || element.tagName === 'BUTTON' ? 50 : 30;
+                
+                // Randomly assign colored particles
+                const blueCount = Math.floor(Math.random() * 2) + 2; // 2-3 blue particles
+                const purpleCount = Math.floor(Math.random() * 2) + 1; // 1-2 purple particles
+                const coloredParticleCount = blueCount + purpleCount;
+                const coloredIndices = [];
+                
+                // Randomly select indices for colored particles
+                while (coloredIndices.length < coloredParticleCount) {
+                    const randomIndex = Math.floor(Math.random() * particleCount);
+                    if (!coloredIndices.includes(randomIndex)) {
+                        coloredIndices.push(randomIndex);
+                    }
+                }
+                
+                // Shuffle to randomly assign colors
+                const shuffled = coloredIndices.sort(() => Math.random() - 0.5);
+                const blueIndices = shuffled.slice(0, blueCount);
+                const purpleIndices = shuffled.slice(blueCount, blueCount + purpleCount);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    
+                    // Assign muted purple or muted blue color to selected particles
+                    if (blueIndices.includes(i)) {
+                        particle.classList.add('particle-blue');
+                    } else if (purpleIndices.includes(i)) {
+                        particle.classList.add('particle-purple');
+                    }
+                    
+                    particle.style.setProperty('--x', `${Math.random() * 150 - 75}px`);
+                    particle.style.setProperty('--y', `${Math.random() * 150 - 75}px`);
+                    particle.style.animation = `particleFloat ${1 + Math.random() * 2}s infinite`;
+                    particle.style.left = `${Math.random() * 100}%`;
+                    particle.style.top = `${Math.random() * 100}%`;
+                    particlesField.appendChild(particle);
+                }
+                
+                // Mouse move handler - magnetic effect (lighter effect for links)
+                const magneticStrength = element.classList.contains('btn') || element.tagName === 'BUTTON' ? 0.3 : 0.15;
+                
+                element.addEventListener('mousemove', (e) => {
+                    const rect = element.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    
+                    // Calculate element center
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
+                    // Magnetic pull (lighter for links)
+                    const moveX = (mouseX - centerX) * magneticStrength;
+                    const moveY = (mouseY - centerY) * magneticStrength;
+                    
+                    element.style.transform = `translate(${moveX}px, ${moveY}px)`;
+                });
+                
+                // Mouse leave handler - smooth return
+                element.addEventListener('mouseleave', () => {
+                    element.style.transform = 'translate(0, 0)';
+                });
+            });
+        }
+        
+        // Also apply to dynamically added elements
+        function applyMagneticToNewElements() {
+            const observer = new MutationObserver(() => {
+                initMagneticButtons();
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+        
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            initMagneticButtons();
+            applyMagneticToNewElements();
+        });
+    </script>
+</body>
+</html>
+

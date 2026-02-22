@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movies We Both Loved</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Movies We Both Loved</h1>
+            <a href="{{ url_for('index') }}" class="back-link">← Back to Home</a>
+        </header>
+
+        <div class="stats-summary">
+            <p>Movies rated 4.0 or higher by both Sali and Gorg</p>
+            <p class="count-badge">{{ both_loved|length }} movies</p>
+        </div>
+
+        <div class="recommendations-grid both-loved-grid">
+            {% for movie in both_loved %}
+            <div class="movie-card both-loved-card-item">
+                {% if movie.poster_url and movie.tmdb_id %}
+                <a href="{{ url_for('movie_detail', tmdb_id=movie.tmdb_id) }}">
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-poster clickable-poster" onerror="this.style.display='none'">
+                </a>
+                {% elif movie.poster_url %}
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-poster" onerror="this.style.display='none'">
+                {% endif %}
+                <div class="movie-info">
+                    <div class="movie-title-row">
+                        {% if movie.tmdb_id %}
+                        <h3 class="movie-title"><a href="{{ url_for('movie_detail', tmdb_id=movie.tmdb_id) }}" class="movie-title-link">{{ movie.title }}</a></h3>
+                        {% else %}
+                        <h3 class="movie-title">{{ movie.title }}</h3>
+                        {% endif %}
+                    </div>
+                    <div class="movie-ratings">
+                        <span>Sali: {{ "%.1f"|format(movie.sali_rating) }}</span>
+                        <span>Gorg: {{ "%.1f"|format(movie.gorg_rating) }}</span>
+                        <span class="avg-rating">Avg: {{ "%.1f"|format(movie.avg_rating) }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
+

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Recommendations for Sali & Gorg</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Moon Reflection Canvas Animation at Top -->
+    <canvas id="sky-sea-canvas" width="100" height="100"></canvas>
+    
+    <div class="container">
+        <header>
+            <h1>Movie Recommendations</h1>
+            <p class="subtitle">Personalized for us</p>
+        </header>
+
+        <div class="header-image-container">
+            <img src="{{ url_for('static', filename='images/IMG_1463.JPG') }}" alt="Couple on rooftop" class="header-image" />
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Sali's Films</h3>
+                <a href="https://letterboxd.com/salicore/" target="_blank" class="stat-number-link">
+                    <div class="stat-number">{{ stats.sali_total }}</div>
+                </a>
+                <div class="stat-detail">Avg Rating: {{ "%.1f"|format(stats.sali_avg_rating) }}</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Gorg's Films</h3>
+                <a href="https://letterboxd.com/dmcoutlaw/" target="_blank" class="stat-number-link">
+                    <div class="stat-number">{{ stats.gorg_total }}</div>
+                </a>
+                <div class="stat-detail">Avg Rating: {{ "%.1f"|format(stats.gorg_avg_rating) }}</div>
+            </div>
+            
+            <div class="stat-card highlight">
+                <h3>Both Loved</h3>
+                <a href="{{ url_for('both_loved') }}" class="stat-number-link">
+                    <div class="stat-number">{{ stats.both_loved_count }}</div>
+                </a>
+                <div class="stat-detail">Movies rated 4+ by both</div>
+            </div>
+            
+            <div class="stat-card highlight">
+                <h3>Recommendations</h3>
+                <div class="stat-number">{{ stats.recommendations_count }}</div>
+                <div class="stat-detail">Movies & TV ready to watch</div>
+            </div>
+        </div>
+
+        <div class="cta-section">
+            <a href="{{ url_for('recommendations') }}" class="btn magnetic cta-button">
+                <span>View All Recommendations</span>
+                <div class="particles-field"></div>
+            </a>
+        </div>
+
+        {% if stats.both_loved %}
+        <section class="both-loved">
+            <h2><a href="{{ url_for('both_loved') }}" class="section-link">Movies We Both Loved</a></h2>
+            <div class="recommendations-grid" id="both-loved-grid">
+                {% for movie in stats.both_loved %}
+                <div class="movie-card both-loved-card-item">
+                    {% if movie.poster_url and movie.tmdb_id %}
+                    <a href="{{ url_for('movie_detail', tmdb_id=movie.tmdb_id) }}">
+                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-poster clickable-poster" onerror="this.style.display='none'">
+                    </a>
+                    {% elif movie.poster_url %}
+                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-poster" onerror="this.style.display='none'">
+                    {% endif %}
+                    <div class="movie-info">
+                        <div class="movie-title-row">
+                            {% if movie.tmdb_id %}
+                            <h3 class="movie-title"><a href="{{ url_for('movie_detail', tmdb_id=movie.tmdb_id) }}" class="movie-title-link">{{ movie.title }}</a></h3>
+                            {% else %}
+                            <h3 class="movie-title">{{ movie.title }}</h3>
+                            {% endif %}
+                        </div>
+                        <div class="movie-ratings">
+                            <span>Sali: {{ "%.1f"|format(movie.sali_rating) }}</span>
+                            <span>Gorg: {{ "%.1f"|format(movie.gorg_rating) }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        <!-- Store full list for rotation -->
+        {% if stats.both_loved_full %}
+        <script>
+            window.bothLovedFullList = {{ stats.both_loved_full | tojsonfilter | safe }};
+        </script>
+        {% endif %}
+        {% endif %}
+
+        {% if top_recommendations %}
+        <section class="top-recommendations">
+            <h2>Top Recommendations</h2>
+            <div class="recommendations-grid">
+                {% for rec in top_recommendations %}
+                <div class="movie-card">
+                    {% if rec.poster_url and rec.tmdb_id %}
+                    <a href="{{ url_for('movie_detail', tmdb_id=rec.tmdb_id) }}">
+                        <img src="{{ rec.poster_url }}" alt="{{ rec.title }}" class="movie-poster clickable-poster" onerror="this.style.display='none'">
+                    </a>
+                    {% elif rec.poster_url %}
+                    <img src="{{ rec.poster_url }}" alt="{{ rec.title }}" class="movie-poster" onerror="this.style.display='none'">
+                    {% endif %}
+                    <div class="movie-info">
+                        <div class="movie-title-row">
+                            <h3 class="movie-title"><a href="{{ url_for('movie_detail', tmdb_id=rec.tmdb_id) }}" class="movie-title-link">{{ rec.title }} ({{ rec.year }})</a></h3>
+                            <a href="https://www.youtube.com/results?search_query={{ (rec.title + ' ' + (rec.year|string if rec.year else '') + ' trailer')|urlencode }}" 
+                               target="_blank" 
+                               class="trailer-link" 
+                               title="Watch trailer">
+                                <span class="play-icon">▶</span>
+                            </a>
+                        </div>
+                        <div class="movie-meta">
+                            {% if rec.imdb_id %}
+                            <a href="https://www.imdb.com/title/{{ rec.imdb_id }}" target="_blank" class="external-rating-link imdb-link" title="View on IMDB">
+                                <span class="rating-icon-small">🎬</span> IMDB: {{ rec.imdb_rating if rec.imdb_rating else 'N/A' }}
+                            </a>
+                            {% endif %}
+                            {% if rec.rotten_tomatoes_rating %}
+                            <a href="https://www.rottentomatoes.com/search?search={{ rec.title|urlencode }}" target="_blank" class="external-rating-link rt-link" title="View on Rotten Tomatoes">
+                                <span class="rating-icon-small">🍅</span> RT: {{ rec.rotten_tomatoes_rating }}
+                            </a>
+                            {% endif %}
+                        </div>
+                        <p class="movie-overview">{% if rec.overview and rec.overview is string %}{{ rec.overview[:120] }}{% if rec.overview|length > 120 %}...{% endif %}{% else %}No overview available{% endif %}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+    </div>
+    
+    <!-- Place Pet Iframe at Bottom of Page Content (not fixed) -->
+    <iframe id="pet-iframe" width="314" height="321" scrolling="no"
+        src="https://gifypet.neocities.org/pet/pet.html?name=homie&dob=1763233162&gender=f&element=Water&pet=robot.gif&map=&background=&tablecolor=white&textcolor=white"
+        frameborder="0"></iframe>
+
+    <!-- Keep your JS for the moon reflection animation here -->
+    <script>
+        // Magnetic Effect for all clickable elements
+        function initMagneticButtons() {
+            // Select all clickable elements
+            // Get all links and buttons first
+            const allLinks = document.querySelectorAll('a, button');
+            const clickableElements = new Set();
+            
+            allLinks.forEach(link => {
+                clickableElements.add(link);
+            });
+            
+            // Also get clickable posters (images inside links - apply to parent link)
+            document.querySelectorAll('.clickable-poster').forEach(img => {
+                const parentLink = img.closest('a');
+                if (parentLink) {
+                    clickableElements.add(parentLink);
+                }
+            });
+            
+            clickableElements.forEach(element => {
+                // Skip if element already has particles field
+                if (element.querySelector('.particles-field')) return;
+                
+                // Create particles field if it doesn't exist
+                let particlesField = element.querySelector('.particles-field');
+                if (!particlesField) {
+                    particlesField = document.createElement('div');
+                    particlesField.className = 'particles-field';
+                    element.appendChild(particlesField);
+                }
+                
+                // Create 30 particles for smaller elements (less intense effect)
+                const particleCount = element.classList.contains('btn') || element.tagName === 'BUTTON' ? 50 : 30;
+                
+                // Randomly assign colored particles
+                const blueCount = Math.floor(Math.random() * 2) + 2; // 2-3 blue particles
+                const purpleCount = Math.floor(Math.random() * 2) + 1; // 1-2 purple particles
+                const coloredParticleCount = blueCount + purpleCount;
+                const coloredIndices = [];
+                
+                // Randomly select indices for colored particles
+                while (coloredIndices.length < coloredParticleCount) {
+                    const randomIndex = Math.floor(Math.random() * particleCount);
+                    if (!coloredIndices.includes(randomIndex)) {
+                        coloredIndices.push(randomIndex);
+                    }
+                }
+                
+                // Shuffle to randomly assign colors
+                const shuffled = coloredIndices.sort(() => Math.random() - 0.5);
+                const blueIndices = shuffled.slice(0, blueCount);
+                const purpleIndices = shuffled.slice(blueCount, blueCount + purpleCount);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    
+                    // Assign muted purple or muted blue color to selected particles
+                    if (blueIndices.includes(i)) {
+                        particle.classList.add('particle-blue');
+                    } else if (purpleIndices.includes(i)) {
+                        particle.classList.add('particle-purple');
+                    }
+                    
+                    particle.style.setProperty('--x', `${Math.random() * 150 - 75}px`);
+                    particle.style.setProperty('--y', `${Math.random() * 150 - 75}px`);
+                    particle.style.animation = `particleFloat ${1 + Math.random() * 2}s infinite`;
+                    particle.style.left = `${Math.random() * 100}%`;
+                    particle.style.top = `${Math.random() * 100}%`;
+                    particlesField.appendChild(particle);
+                }
+                
+                // Mouse move handler - magnetic effect (lighter effect for links)
+                const magneticStrength = element.classList.contains('btn') || element.tagName === 'BUTTON' ? 0.3 : 0.15;
+                
+                element.addEventListener('mousemove', (e) => {
+                    const rect = element.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    
+                    // Calculate element center
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
+                    // Magnetic pull (lighter for links)
+                    const moveX = (mouseX - centerX) * magneticStrength;
+                    const moveY = (mouseY - centerY) * magneticStrength;
+                    
+                    element.style.transform = `translate(${moveX}px, ${moveY}px)`;
+                });
+                
+                // Mouse leave handler - smooth return
+                element.addEventListener('mouseleave', () => {
+                    element.style.transform = 'translate(0, 0)';
+                });
+            });
+        }
+        
+        // Also apply to dynamically added elements
+        function applyMagneticToNewElements() {
+            const observer = new MutationObserver(() => {
+                initMagneticButtons();
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+        
+        // Lock canvas in place
+        function lockCanvasPosition() {
+            const canvas = document.getElementById('sky-sea-canvas');
+            if (!canvas) return;
+            
+            function updatePosition() {
+                canvas.style.position = 'fixed';
+                canvas.style.top = '20px';
+                canvas.style.right = '20px';
+                canvas.style.left = 'auto';
+                canvas.style.bottom = 'auto';
+                canvas.style.transform = 'none';
+                canvas.style.webkitTransform = 'none';
+            }
+            
+            // Update on scroll, resize, and continuously
+            window.addEventListener('scroll', updatePosition, { passive: true });
+            window.addEventListener('resize', updatePosition);
+            setInterval(updatePosition, 50);
+            updatePosition();
+        }
+        
+        // Sky/Sea Animation
+        function initSkySea() {
+            const { min, max, round, floor, abs, sqrt } = Math;
+            const random = (x = 1) => Math.random() * x;
+            const rgb = (...values) => `rgb(${values.join(',')})`;
+            const rgba = (...values) => `rgba(${values.join(',')})`;
+            const distance = (x1, y1, x2, y2) => sqrt(abs(x1 - x2)**2 + abs(y1 - y2)**2);
+
+            const Sky = (() => {
+                const State = {
+                    pos: [0, 0],
+                    stars: [],
+                    moonPos: []
+                };
+                const speed = 0.05;
+
+                function updatePosition() {
+                    State.pos[0] -= speed;
+                    State.pos[1] += speed;
+                }
+
+                function reset() {
+                    State.pos = [0, 0];
+                    State.stars = [];
+                    State.moonPos = [];
+                }
+
+                function spaceColor(size) {
+                    const moonAltitude = size / 2 - State.pos[1] + moonSize;
+                    return rgb(
+                        min(max(0, moonAltitude), 12.5),
+                        min(max(5, moonAltitude), 20),
+                        min(max(10, moonAltitude), 25)
+                    );
+                }
+
+                function drawSpace(ctx, size) {
+                    ctx.fillStyle = spaceColor(size);
+                    ctx.fillRect(0, 0, size, size / 2);
+                    let px = size * -1;
+                    while (px++ < size * size) {
+                        let pxX = px % (size * 2);
+                        let pxY = floor(px / (size * 2));
+                        const moonX = State.moonPos[0] + moonSize / 2 - 1;
+                        const moonY = State.moonPos[1] + moonSize / 2;
+                        const moonDistance = distance(moonX, moonY, pxX, pxY);
+                        if (moonDistance < moonSize * 1.75) {
+                            ctx.fillStyle = rgba(255, 255, 255, .05);
+                            ctx.fillRect(State.pos[0] + pxX, State.pos[1] + pxY, 1, 1);
+                        }
+                        if (moonDistance < moonSize) {
+                            ctx.fillStyle = rgba(255, 255, 255, .1);
+                            ctx.fillRect(State.pos[0] + pxX, State.pos[1] + pxY, 1, 1);
+                        }
+                    }
+                }
+
+                const starCount = () => 1000 + round(random(2000));
+                const starColor = () => rgba(255, 200 + round(random(55)), 200 + round(random(20)), random());
+
+                function generateStars(size) {
+                    if (State.stars.length) return;
+                    let count = starCount();
+                    while (count-- > 0) {
+                        State.stars.push([
+                            round(random(size * 8)),
+                            round(random(size * 8)) * -1 + size
+                        ]);
+                    }
+                }
+
+                function drawStars(ctx, size) {
+                    let star = State.stars.length;
+                    while (star-- > 0) {
+                        ctx.fillStyle = starColor();
+                        ctx.fillRect(
+                            State.stars[star][0] + State.pos[0],
+                            State.stars[star][1] + State.pos[1],
+                            1, 1
+                        );
+                    }
+                }
+
+                const moonSize = 10;
+                const moonColors = {
+                    0: 'transparent',
+                    1: rgb(210, 210, 210),
+                    2: rgb(255, 255, 255),
+                    3: rgb(120, 120, 120),
+                };
+                const moonBitmap = [
+                    0, 0, 0, 0, 1, 1, 0, 0, 0, 0,
+                    0, 0, 1, 2, 1, 1, 1, 1, 0, 0,
+                    0, 1, 1, 1, 1, 3, 3, 3, 1, 0,
+                    0, 1, 3, 3, 1, 1, 3, 3, 1, 0,
+                    1, 3, 3, 3, 3, 2, 1, 3, 1, 1,
+                    1, 1, 3, 3, 3, 1, 1, 1, 1, 1,
+                    0, 1, 1, 3, 1, 2, 1, 1, 1, 0,
+                    0, 1, 1, 1, 2, 2, 2, 1, 1, 0,
+                    0, 0, 1, 1, 1, 1, 1, 1, 0, 0,
+                    0, 0, 0, 0, 1, 1, 0, 0, 0, 0
+                ];
+
+                function placeMoon(size) {
+                    if (State.moonPos.length) return;
+                    State.moonPos[0] = size / 3 + round(random(size / 2));
+                    State.moonPos[1] = moonSize + round(random(size / 10));
+                }
+
+                function drawMoon(ctx, size) {
+                    let bit = 0;
+                    while (bit++ < moonBitmap.length - 1) {
+                        const bitPos = [
+                            State.moonPos[0] + State.pos[0] + bit % moonSize,
+                            State.moonPos[1] + State.pos[1] + floor(bit / moonSize)
+                        ];
+                        ctx.fillStyle = moonColors[moonBitmap[bit]];
+                        ctx.fillRect(bitPos[0], bitPos[1], 1, 1);
+                    }
+                }
+
+                return Object.freeze({
+                    draw(ctx, size) {
+                        generateStars(size);
+                        placeMoon(size);
+                        drawSpace(ctx, size);
+                        drawStars(ctx, size);
+                        drawMoon(ctx, size);
+                        updatePosition();
+                        return {
+                            x: State.pos[0],
+                            y: State.pos[1],
+                            moonPos: {
+                                x: State.pos[0] + State.moonPos[0] + moonSize / 2 - 1,
+                                y: State.pos[1] + State.moonPos[1] + moonSize / 2
+                            },
+                            moonSize
+                        };
+                    },
+                    reset
+                });
+            })();
+
+            const Sea = (() => {
+                function seaColor(size, moonAlt) {
+                    const alt = size / 2 - moonAlt;
+                    const minGreen = 10 + round(random(10));
+                    const maxGreen = 10 + round(random(25));
+                    const minBlue = 20 + round(random(50));
+                    const maxBlue = 50 + round(random() > .9 ? random(120) : random(50));
+                    return rgb(
+                        0,
+                        max(maxGreen + min(alt * 3, 0), minGreen),
+                        max(maxBlue + min(alt * 3, 0), minBlue)
+                    );
+                }
+
+                return Object.freeze({
+                    draw(ctx, size, { x: skyX, y: skyY, moonPos, moonSize }) {
+                        let x = 0;
+                        let y = 50;
+                        while (x * y < size * size) {
+                            const xSize = round(random(5));
+                            ctx.fillStyle = seaColor(size, skyY + moonSize);
+                            ctx.fillRect(x, y, xSize, 1);
+                            const verticalShine = min(1.25, size / 2 - moonPos.y + moonSize / 2);
+                            if (moonPos.x + moonSize >= x && moonPos.x - moonSize <= x) {
+                                ctx.fillStyle = rgba(255, 255, 255, verticalShine / 10);
+                                ctx.fillRect(x, y, xSize, 1);
+                            }
+                            const verticalNarrowShine = min(0.75, size / 2 - moonPos.y + moonSize / 2);
+                            if (moonPos.x + moonSize / 2 >= x && moonPos.x - moonSize / 2 <= x) {
+                                ctx.fillStyle = rgba(255, 255, 255, verticalNarrowShine / 10);
+                                ctx.fillRect(x, y, xSize, 1);
+                            }
+                            const circularShine = min(2.5, size / 2 - moonPos.y + moonSize);
+                            const moonDistance = distance(moonPos.x, moonPos.y, x, y);
+                            if (moonDistance < moonSize * 2) {
+                                ctx.fillStyle = rgba(255, 255, 255, circularShine / 10);
+                                ctx.fillRect(x, y, xSize, 1);
+                            }
+                            x += xSize;
+                            if (x >= size) {
+                                x = 0;
+                                y++;
+                            }
+                        }
+                    }
+                });
+            })();
+
+            const canvas = document.getElementById('sky-sea-canvas');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+
+            function draw() {
+                ctx.clearRect(0, 0, size, size);
+                const skyState = Sky.draw(ctx, size);
+                Sea.draw(ctx, size, skyState);
+                requestAnimationFrame(draw);
+            }
+
+            function reset() {
+                Sky.reset();
+            }
+
+            canvas.addEventListener('click', reset);
+            draw();
+        }
+        // Rotate both loved movies
+        function initBothLovedRotation() {
+            if (!window.bothLovedFullList || window.bothLovedFullList.length <= 5) {
+                return; // Not enough movies to rotate
+            }
+            
+            const grid = document.getElementById('both-loved-grid');
+            if (!grid) return;
+            
+            let currentIndex = 0;
+            const displayCount = 5;
+            const allMovies = window.bothLovedFullList;
+            
+            function renderMovies(startIndex) {
+                const moviesToShow = [];
+                for (let i = 0; i < displayCount; i++) {
+                    const movieIndex = (startIndex + i) % allMovies.length;
+                    moviesToShow.push(allMovies[movieIndex]);
+                }
+                
+                grid.innerHTML = moviesToShow.map(movie => {
+                    const posterHtml = movie.poster_url && movie.tmdb_id 
+                        ? `<a href="/movie/${movie.tmdb_id}"><img src="${movie.poster_url}" alt="${movie.title}" class="movie-poster clickable-poster" onerror="this.style.display='none'"></a>`
+                        : movie.poster_url 
+                        ? `<img src="${movie.poster_url}" alt="${movie.title}" class="movie-poster" onerror="this.style.display='none'">`
+                        : '';
+                    
+                    const titleHtml = movie.tmdb_id
+                        ? `<h3 class="movie-title"><a href="/movie/${movie.tmdb_id}" class="movie-title-link">${movie.title}</a></h3>`
+                        : `<h3 class="movie-title">${movie.title}</h3>`;
+                    
+                    return `
+                        <div class="movie-card both-loved-card-item">
+                            ${posterHtml}
+                            <div class="movie-info">
+                                <div class="movie-title-row">
+                                    ${titleHtml}
+                                </div>
+                                <div class="movie-ratings">
+                                    <span>Sali: ${movie.sali_rating.toFixed(1)}</span>
+                                    <span>Gorg: ${movie.gorg_rating.toFixed(1)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            // Rotate every 5 seconds
+            setInterval(() => {
+                currentIndex = (currentIndex + 1) % allMovies.length;
+                renderMovies(currentIndex);
+            }, 5000);
+        }
+        
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            initMagneticButtons();
+            applyMagneticToNewElements();
+            initSkySea();
+            lockCanvasPosition();
+            initBothLovedRotation();
+        });
+    </script>
+</body>
+</html>
+
+

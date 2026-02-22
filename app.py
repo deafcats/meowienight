@@ -2,11 +2,13 @@ import json
 import os
 import random
 import re
+import threading
 from functools import lru_cache
 from urllib.parse import quote_plus
 
 import pandas as pd
 import requests
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
@@ -16,6 +18,7 @@ app = Flask(__name__)
 # ---------------------------------------------------------------------------
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "2073a6aadc1cb24381bc90c83ace363a")
 OMDB_API_KEY = os.environ.get("OMDB_API_KEY", "b9a5e69d")
+DATA_DIR = os.environ.get("DATA_DIR", ".")
 
 SUPERHERO_KEYWORDS = {
     "spider-man", "batman", "superman", "iron man", "captain america",
@@ -61,12 +64,13 @@ def _load_csv(path: str) -> pd.DataFrame:
 
 def load_data():
     """Return (recommendations, genre_recs, tv_recs, gorg_films, sali_films)."""
+    d = DATA_DIR
     return (
-        _load_csv("movie_recommendations_improved.csv"),
-        _load_csv("genre_recommendations.csv"),
-        _load_csv("tv_recommendations.csv"),
-        _load_csv("gorg_scraped_films.csv"),
-        _load_csv("salicore_scraped_films.csv"),
+        _load_csv(os.path.join(d, "movie_recommendations_improved.csv")),
+        _load_csv(os.path.join(d, "genre_recommendations.csv")),
+        _load_csv(os.path.join(d, "tv_recommendations.csv")),
+        _load_csv(os.path.join(d, "gorg_scraped_films.csv")),
+        _load_csv(os.path.join(d, "salicore_scraped_films.csv")),
     )
 
 
@@ -736,6 +740,58 @@ def _find_both_loved(gorg_films, sali_films, fetch_tmdb=False, include_avg=False
         result.append(entry)
     return result
 
+
+# ---------------------------------------------------------------------------
+# Background pipeline scheduler
+# ---------------------------------------------------------------------------
+
+_pipeline_lock = threading.Lock()
+
+
+def _run_pipeline_and_reload():
+    """Run the full data pipeline then invalidate the CSV cache."""
+    if not _pipeline_lock.acquire(blocking=False):
+        print("Pipeline already running — skipping.")
+        return
+    try:
+        from pipeline import run_pipeline
+        run_pipeline(data_dir=DATA_DIR)
+        invalidate_cache()
+        print("CSV cache invalidated — fresh data will be served.")
+    finally:
+        _pipeline_lock.release()
+
+
+def _start_scheduler():
+    """Boot the APScheduler: run immediately if no data, then twice weekly."""
+    from pipeline import csvs_exist
+
+    scheduler = BackgroundScheduler(daemon=True)
+
+    # Twice weekly — Monday and Thursday at 04:00 UTC
+    scheduler.add_job(
+        _run_pipeline_and_reload,
+        "cron",
+        day_of_week="mon,thu",
+        hour=4,
+        minute=0,
+        id="pipeline_scheduled",
+        replace_existing=True,
+    )
+    scheduler.start()
+
+    # If CSVs don't exist yet, kick off an immediate run in a thread
+    if not csvs_exist(DATA_DIR):
+        print("No data found — running pipeline now...")
+        threading.Thread(target=_run_pipeline_and_reload, daemon=True).start()
+    else:
+        print("Existing data found — loading from cache.")
+
+
+# Start the scheduler when the module is imported by gunicorn / flask run.
+# Guard against double-start in debug reloader.
+if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
+    _start_scheduler()
 
 # ---------------------------------------------------------------------------
 # Entry point
